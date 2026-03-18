@@ -1,0 +1,141 @@
+<?xml version="1.0"?>
+<visualdsp-project schema="16" name="ale" file="F:\proiect 2 2026\_P2_2026_final\Exemple prelucrari de semnal\Visual DSP\test_ALE\ale.dpj" generated="Thu Jan 29 15:14:12 2026" expanded="yes">
+	<!-- Project build target -->
+	<target>
+		<processor>ADSP-2181</processor>
+		<extension>.dxe</extension>
+		<type>DSP executable file</type>
+	</target>
+	<!-- Configurations -->
+	<configurations active="Debug">
+		<configuration name="Debug">
+			<intermediate-dir>.\Debug</intermediate-dir>
+			<output-dir>.\Debug</output-dir>
+			<tools>
+				<tool type="VCSE">
+					<option><![CDATA[|-Version>3.5|NOSWITCH>1]]></option>
+				</tool>
+				<tool type="Compiler">
+					<option><![CDATA[|-Version>3.5|-O1>0|-Ov>100|-g>1]]></option>
+				</tool>
+				<tool type="Assembler">
+					<option><![CDATA[|-Version>3.5|-g>1]]></option>
+				</tool>
+				<tool type="Linker">
+					<option><![CDATA[|-Version>3.5|NOSWITCH>1]]></option>
+				</tool>
+				<tool type="Archiver">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Splitter">
+					<option><![CDATA[|-Version>3.5|-s>1|-pm>1]]></option>
+				</tool>
+			</tools>
+		</configuration>
+		<configuration name="Release">
+			<intermediate-dir>.\Release</intermediate-dir>
+			<output-dir>.\Release</output-dir>
+			<tools>
+				<tool type="VCSE">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Compiler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Assembler">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Linker">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Archiver">
+					<option><![CDATA[]]></option>
+				</tool>
+				<tool type="Splitter">
+					<option><![CDATA[]]></option>
+				</tool>
+			</tools>
+		</configuration>
+	</configurations>
+	<!-- Project folders -->
+	<folders>
+		<folder name="Header Files" ext=".h,.hpp,.hxx" expanded="no">
+			<files>
+				<file name=".\ALE.H">
+				</file>
+			</files>
+		</folder>
+		<folder name="Linker Files" ext=".ldf,.dlb" expanded="no">
+			<files>
+				<file name=".\ADSP-2181_ASM.ldf">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+			</files>
+		</folder>
+		<folder name="Source Files" ext=".c,.cpp,.cxx,.asm,.dsp,.s" expanded="yes">
+			<files>
+				<file name=".\ALE_FCT.DSP">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+				<file name=".\ALE_IO.DSP">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+				<file name=".\ALE_TEST.DSP">
+					<file-configurations>
+						<file-configuration name="Debug">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Debug</intermediate-dir>
+							<output-dir>.\Debug</output-dir>
+						</file-configuration>
+						<file-configuration name="Release">
+							<excluded-flag value="no"/>
+							<build-with-flag value="project"/>
+							<intermediate-dir>.\Release</intermediate-dir>
+							<output-dir>.\Release</output-dir>
+						</file-configuration>
+					</file-configurations>
+				</file>
+			</files>
+		</folder>
+	</folders>
+</visualdsp-project>
