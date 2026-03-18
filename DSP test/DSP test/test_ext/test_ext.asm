@@ -749,7 +749,8 @@ generate_noise:
         ax0 = dm(noise_seed);
         ay0 = 0x0001;
         ar = ax0 and ay0;
-        sr = lshift ax0 by -1 (hi);
+        ar = ax0;
+        sr = lshift ar by -1 (hi);
         ax0 = sr1;
         if eq jump noise_store;
         ay0 = 0xB400;
@@ -849,8 +850,8 @@ reset_ale_coeff:
         l2 = ALE_BUF_LEN;
         i4 = ale_input;
         ax0 = dm(ale_delay);
-        m0 = ax0;
-        modify(i4, m0);
+        m4 = ax0;
+        modify(i4, m4);
         l4 = ALE_BUF_LEN;
         i3 = ale_fir;
         l3 = ALE_TAPS;
