@@ -18,6 +18,15 @@
 #define ALE_TAPS        32
 #define ALE_BUF_LEN     256
 
+.global simulator_mode;
+.global debug_override_enable;
+.global debug_command;
+.global debug_switches;
+.global current_command;
+.global current_switches;
+.global current_mode;
+.global current_channel;
+
 
 .SECTION/DM     buf_var1;
 .var    rx_buf[3];
@@ -57,6 +66,7 @@
 .var    selected_output = 0x0000;
 .var    ale_noisy_input = 0x0000;
 
+.var    simulator_mode = 0x0000;
 .var    debug_override_enable = 0x0000;
 .var    debug_command = 0x00C0;
 .var    debug_switches = 0x0000;
@@ -164,6 +174,10 @@ start:
         ax0 = 1;
         dm(stat_flag) = ax0;
 
+        ax0 = dm(simulator_mode);
+        ar = pass ax0;
+        if ne jump setup_simulator;
+
         ena ints;
         imask = 0x0040;
 
@@ -197,6 +211,13 @@ wait_aci_clear:
         dm(tx_buf) = ar;
         idle;
 
+        jump finish_runtime_init;
+
+setup_simulator:
+        ena ints;
+        imask = 0x0200;
+
+finish_runtime_init:
         ifc = b#00000011111110;
         nop;
 
@@ -222,6 +243,10 @@ wait_aci_clear:
         si = 0x0079;
         IO(PORT_OUT) = si;
 
+        ax0 = dm(simulator_mode);
+        ar = pass ax0;
+        if ne jump main_wait;
+
         imask = 0x0220;
 
 main_wait:
@@ -230,6 +255,17 @@ main_wait:
 
 
 cmd_interrupt:
+        ax0 = dm(debug_override_enable);
+        ar = pass ax0;
+        if eq jump cmd_interrupt_hw;
+        ena sec_reg;
+        call latch_command;
+        ax0 = 0;
+        dm(flag_cda) = ax0;
+        dis sec_reg;
+        rti;
+
+cmd_interrupt_hw:
         ax0 = 1;
         dm(flag_cda) = ax0;
         rti;
