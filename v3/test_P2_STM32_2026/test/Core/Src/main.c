@@ -53,6 +53,7 @@ static volatile uint8_t g_sampledCommand;
 static volatile uint8_t g_prgLevel;
 static volatile uint8_t g_tickReady;
 static volatile uint8_t g_lastCommand;
+static uint8_t g_pendingCommand;
 static ArmState_t g_armState = ARM_STATE_WAIT_RELEASE;
 
 /* USER CODE END PV */
@@ -63,6 +64,7 @@ static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static uint8_t ARM_ReadCommand(void);
+static uint8_t ARM_BuildCommand(uint8_t rawValue);
 static void ARM_WriteLedBus(uint8_t value);
 static void ARM_WriteCommandBus(uint8_t value);
 static void ARM_TransmitCommand(uint8_t value);
@@ -74,7 +76,7 @@ static void ARM_TransmitCommand(uint8_t value);
 /* Timer2 Interrupt Service Routine*/
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  if (htim->Instance != TIM2) //Stare curenta PRG (PA9)
+  if (htim->Instance != TIM2)
   {
     return;
   }
@@ -118,7 +120,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   ARM_WriteLedBus(0U);
   ARM_WriteCommandBus(0U);
-  HAL_TIM_Base_Start_IT(&htim2); //enable Timer 2 interrupt
+  HAL_TIM_Base_Start_IT(&htim2); //porneste intreruperea periodica a lui TIM2
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,12 +153,13 @@ int main(void)
       case ARM_STATE_WAIT_PRESS:
         if (prgLevel != 0U)
         {
+          g_pendingCommand = ARM_BuildCommand(sampledCommand);
           g_armState = ARM_STATE_TRANSMIT;
         }
         break;
 
       case ARM_STATE_TRANSMIT:
-        ARM_TransmitCommand(sampledCommand);
+        ARM_TransmitCommand(g_pendingCommand);
         g_armState = ARM_STATE_WAIT_RELEASE;
         break;
 
@@ -330,6 +333,12 @@ static uint8_t ARM_ReadCommand(void)
   value |= (HAL_GPIO_ReadPin(B7_GPIO_Port, B7_Pin) == GPIO_PIN_SET) ? (1U << 7) : 0U;
 
   return value;
+}
+
+static uint8_t ARM_BuildCommand(uint8_t rawValue)
+{
+  /* D7 si D6 raman biti de validare, iar bitii D5...D0 sunt preluati din intrare. */
+  return (uint8_t)(0xC0U | (rawValue & 0x3FU));
 }
 
 static void ARM_WriteLedBus(uint8_t value)
