@@ -1,0 +1,13 @@
+Adding a Data Set to a Plot Window
+
+Page 1 of 1
+
+Adding a Data Set to a Plot Window
+At a minimum, a plot window must contain at least one data set. The following procedure assumes that the Plot Configuration dialog box is open. To add a data set to a plot window 1. In Name, type a name for the data set. 2. In Memory, select a memory type, such as Program (PM) Memory. 3. In Address, specify the address of the first data point by:
+· Typing a hexadecimal number · Clicking Browse
+The Browse for Symbol dialog box appears. Select a symbol and click OK. The symbol appears in the Address box. Note: When using a BTC channel for plot window auto-refresh, Address specifies the BTC channel. To use BTC channels, the plot start address must match a defined BTC channel. 4. Enter the following specifications: · In Count, type a number (integer), indicating the number of values to plot. · In Stride, type a number (integer), specifying the number of addresses to skip between plotted points. If not specified, the default is 1. · In Data, select the type of data. This specifies the data type of the address. The choices are int (default), uint, long, ulong, float, and double. · In Offset, enter an offset. This is added to the plot address to determine the starting plot data address. 5. (3-D plots only) Specify settings in Row count and Column count. 6. Depending on the plot type, modify the Axis selection. 7. Click Settings. The Plot Settings dialog box appears. 8. Specify the style options for the data set. 9. Specify data processing options for the data set. 10. Click OK. The name of the data set appears in the Data sets box. By default, the data set has a check mark, indicating that this data set is enabled.
+See Also Modifying an existing data set
+
+mk:@MSITStore:C:\Program%20Files\Analog%20Devices\VisualDSP%203.5%2016-Bit\h... 2/7/2012
+
+

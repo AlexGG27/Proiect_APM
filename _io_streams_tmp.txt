@@ -1,0 +1,43 @@
+Simulating Data Input and Output
+
+Page 1 of 3
+
+Simulating Data Input and Output
+The following procedures demonstrate how to simulate a stream (simple I/O). This information applies to all DSP families. Note: An example program for an ADSP-218x DSP is used to demonstrate the setup.
+ADSP-218x Example Program The following procedures are based on Example2 included with the VisualDSP++ software in the installation's \218x\Examples directory. The example program is a talk-thru program. The DSP receives a value in SPORT1 and then transmits it through SPORT1. The main part of the program is an infinite loop that waits for a SPORT1 receive interrupt. The interrupt service routine performs all data processing. (In this example, transferring data from the SPORT receive register to the SPORT transmit register.) Suggestion: Open and view the associated registers when you run the example program or your own I/O simulation. For simulation purposes, an input file (serin.dat) provides the input for the serial port. VisualDSP++ creates an output file (serout.dat) to store the SPORT output. Before you begin, open an editor window to create the serin.dat file. Enter several 8-bit numbers, for example:
+01010001 11110000 00001010
+Once this data file has been saved and closed, you are ready to configure the streams.
+Before Configuring the Stream Complete the following steps. 1. Assemble and link the code to create an executable file. 2. Select a new session with an ADSP-2181 target. 3. Load the executable. 4. From the Debug menu, choose Restart to simulate code boot-up. 5. From the Settings menu, choose Streams.
+The Streams dialog box appears. 6. Click Add.
+The Add New Stream dialog box appears.
+Configuring the Output Stream Configure the output stream as follows. 1. Under Source, select Debug target and set Device to Sport 1.
+Note: To configure a stream for a multiprocessor system, select the processor in Processor. 2. Under Destination, select File and enter the file associated with SPORT1 (serout.dat, in this
+example). This file captures the data. 3. In Format, select Binary. 4. Optionally, clear Rewind on reset or restart. By default, this option is selected, allowing a
+
+mk:@MSITStore:C:\Program%20Files\Analog%20Devices\VisualDSP%203.5%2016-Bit\h... 2/7/2012
+
+Simulating Data Input and Output
+
+Page 2 of 3
+
+regression test to use one file to continue testing. Clearing this option does not rewind the file pointer to the start of the file.
+5. Click Connect. The output stream is now configured.
+Configuring the Input Stream Configure the input stream as follows. 1. Under Source, click File and browse to select serin.dat in the following directory:
+\Examples\Example2 2. Set Format to Binary. 3. Optionally, clear Rewind on reset or restart. By default, this option is selected, allowing a
+regression test to use one file to continue testing. Clearing this option does not rewind the file pointer to the start of the file. 4. Under Destination, set Debug target to Sport 1. The input stream is now configured. 5. Click OK. The Streams dialog appears, and the configured stream displays in the Active streams list. 6. Click OK. The Streams dialog box closes.
+Running the Streams Program The following procedure sets up an RFS1 interrupt to occur every 200 cycles. To run the program 1. From the Settings menu, choose Interrupts.
+The Interrupt Timing dialog box appears. Use this dialog box to instruct the target to generate one or more interrupts. The first interrupt is generated after Offset cycles (Delay) instruction cycles. When Min cycles equals Max cycles, the signal is subsequently generated every Min cycles. Otherwise, the signal is generated at a random interval between Min cycles and Max cycles. 2. In External interrupts, select RFS1. 3. For the Min cycles and Max cycles, enter 200. 4. Run the program. After a few seconds, an error message (similar to the following) indicates that the end of the file has been reached.
+Encountered end of file: FILE (C:\Program Files\Analog Devices\VisualDSP \218x\Examples\Example2\Serin.dat, Binary) Error in reading from stream for SPORT1.
+5. Check the contents of the output file to determine whether the talk-thru simulation executed properly. The values in serout.dat and serin.dat should agree.
+See Also
+
+mk:@MSITStore:C:\Program%20Files\Analog%20Devices\VisualDSP%203.5%2016-Bit\h... 2/7/2012
+
+Simulating Data Input and Output
+Hardware simulation
+
+Page 3 of 3
+
+mk:@MSITStore:C:\Program%20Files\Analog%20Devices\VisualDSP%203.5%2016-Bit\h... 2/7/2012
+
+

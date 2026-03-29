@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<visualdsp-project schema="16" name="median_filter" file="F:\proiect 2 2026\_P2_2026_final\Exemple prelucrari de semnal\Visual DSP\test_MF\median_filter.dpj" generated="Thu Jan 29 15:14:16 2026" expanded="yes">
+<visualdsp-project schema="16" name="median_filter" file="C:\Users\alexg\Desktop\Proiect_APM\Proiect_APM\Exemple prelucrari de semnal\Exemple prelucrari de semnal\Visual DSP\test_MF\median_filter.dpj" generated="Fri Mar 27 22:22:23 2026" expanded="yes">
 	<!-- Project build target -->
 	<target>
 		<processor>ADSP-2181</processor>

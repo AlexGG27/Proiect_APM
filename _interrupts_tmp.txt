@@ -1,0 +1,12 @@
+Simulating External Interrupts
+
+Page 1 of 1
+
+Simulating External Interrupts
+You can simulate external interrupts. This helps to test the DSP under circumstances similar to the real world. When using interrupts with watchpoints and streams, your program simulates real-world operation of your DSP system. To simulate external interrupts 1. From the Settings menu, choose Interrupts.
+The Interrupt Timing dialog box appears. Use this dialog box to instruct the target to generate one or more interrupts. The first interrupt is generated after Offset cycles (Delay) instruction cycles. When Min cycles equals Max cycles, the signal is subsequently generated every Min cycles. Otherwise, the signal is generated at random intervals between Min cycles and Max cycles. 2. Set a breakpoint at the first address of the interrupt vector table. 3. Define the options. 4. Click Add. 5. Click OK.
+See Also Setting up SPORT transmit and test SPORT activity with external interrupts Interrupts
+
+mk:@MSITStore:C:\Program%20Files\Analog%20Devices\VisualDSP%203.5%2016-Bit\h... 2/7/2012
+
+

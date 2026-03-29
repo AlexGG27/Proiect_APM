@@ -18,10 +18,6 @@
 #define ALE_TAPS        32
 #define ALE_BUF_LEN     256
 
-.global simulator_mode;
-.global debug_override_enable;
-.global debug_command;
-.global debug_switches;
 .global current_command;
 .global current_switches;
 .global current_mode;
@@ -65,11 +61,6 @@
 .var    selected_input = 0x0000;
 .var    selected_output = 0x0000;
 .var    ale_noisy_input = 0x0000;
-
-.var    simulator_mode = 0x0000;
-.var    debug_override_enable = 0x0000;
-.var    debug_command = 0x00C0;
-.var    debug_switches = 0x0000;
 
 .var    agc_ref = 0x4000;
 .var    agc_mu = 0x028f;
@@ -174,10 +165,6 @@ start:
         ax0 = 1;
         dm(stat_flag) = ax0;
 
-        ax0 = dm(simulator_mode);
-        ar = pass ax0;
-        if ne jump setup_simulator;
-
         ena ints;
         imask = 0x0040;
 
@@ -213,10 +200,6 @@ wait_aci_clear:
 
         jump finish_runtime_init;
 
-setup_simulator:
-        ena ints;
-        imask = 0x0200;
-
 finish_runtime_init:
         ifc = b#00000011111110;
         nop;
@@ -243,35 +226,35 @@ finish_runtime_init:
         si = 0x0079;
         IO(PORT_OUT) = si;
 
-        ax0 = dm(simulator_mode);
-        ar = pass ax0;
-        if ne jump main_wait;
-
         imask = 0x0220;
 
+/* Starea 0 din organigrama:
+ * DSP-ul asteapta intreruperile.
+ * - IRQ2 poate seta Flag_CDA = 1
+ * - SPORT0 RX intra periodic la fiecare esantion
+ */
 main_wait:
         idle;
         jump main_wait;
 
 
 cmd_interrupt:
-        ax0 = dm(debug_override_enable);
-        ar = pass ax0;
-        if eq jump cmd_interrupt_hw;
-        ena sec_reg;
-        call latch_command;
-        ax0 = 0;
-        dm(flag_cda) = ax0;
-        dis sec_reg;
-        rti;
-
-cmd_interrupt_hw:
+        /* Intreruperea asincrona din organigrama:
+         * butonul IA doar semnalizeaza ca exista o comanda noua.
+         * In modul normal se seteaza Flag_CDA = 1, iar decodarea se face
+         * la intreruperea periodica urmatoare.
+         */
         ax0 = 1;
         dm(flag_cda) = ax0;
         rti;
 
 
 input_samples:
+        /* Intreruperea periodica din organigrama:
+         * se citesc esantioanele de la codec, apoi se alege:
+         * - starea 1 daca Flag_CDA = 1
+         * - starea 2 daca Flag_CDA = 0
+         */
         ena sec_reg;
 
         ax0 = dm(rx_buf + 1);
@@ -281,8 +264,14 @@ input_samples:
 
         ax0 = dm(flag_cda);
         ar = pass ax0;
-        if eq jump process_sample;
+        if eq jump trs_state_2;
 
+trs_state_1:
+        /* Starea 1 din organigrama:
+         * exista o comanda noua pe CDA, deci ea este citita, validata,
+         * se determina ID-ul functiei si se configureaza modul curent.
+         */
+        /* Daca exista comanda noua, ea este decodata la inceputul cadrului audio. */
         call latch_command;
         ax0 = 0;
         dm(flag_cda) = ax0;
@@ -293,7 +282,12 @@ input_samples:
         dis sec_reg;
         rti;
 
+trs_state_2:
 process_sample:
+        /* Starea 2 din organigrama:
+         * daca nu exista comanda noua, se executa functia deja selectata.
+         * Mai intai se alege canalul pe care se aplica prelucrarea.
+         */
         ax0 = dm(current_mode);
         ay0 = MODE_BYPASS;
         ar = ax0 - ay0;
@@ -311,6 +305,12 @@ select_left_input:
         dm(selected_input) = ax0;
 
 dispatch_mode:
+        /* Dupa decodare, modul curent decide ce algoritm ruleaza:
+         * 0 -> AGC
+         * 1 -> ALE
+         * 2 -> MF
+         * alt caz -> bypass
+         */
         ax0 = dm(current_mode);
         ay0 = MODE_AGC;
         ar = ax0 - ay0;
@@ -361,16 +361,14 @@ write_left_processed:
         dm(tx_buf + 2) = ax0;
         dis sec_reg;
         rti;
-
-
 latch_command:
-        ax0 = dm(debug_override_enable);
-        ar = pass ax0;
-        if eq jump read_hw_command;
-        ax0 = dm(debug_command);
-        jump store_command_value;
-
-read_hw_command:
+        /* Blocul "determina ID functie" din organigrama.
+         * Aici se citesc:
+         * - octetul de comanda
+         * - switch-urile pentru parametri
+         * - canalul selectat
+         * - ID-ul functiei AGC / ALE / MF
+         */
         ax0 = dm(Prog_Flag_Data);
         ay0 = 0x00FF;
         ar = ax0 and ay0;
@@ -379,13 +377,6 @@ read_hw_command:
 store_command_value:
         dm(current_command) = ax0;
 
-        ax1 = dm(debug_override_enable);
-        ar = pass ax1;
-        if eq jump read_hw_switches;
-        ax0 = dm(debug_switches);
-        jump store_switch_value;
-
-read_hw_switches:
         si = IO(PORT_IN);
         ax0 = si;
         ay0 = 0x00FF;
@@ -395,6 +386,7 @@ read_hw_switches:
 store_switch_value:
         dm(current_switches) = ax0;
 
+        /* Bitul D3 selecteaza canalul: 0 stanga, 1 dreapta. */
         ax0 = dm(current_command);
         ay0 = CMD_CHANNEL_MASK;
         ar = ax0 and ay0;
@@ -408,6 +400,11 @@ cmd_left_channel:
         dm(current_channel) = ax0;
 
 validate_command:
+        /* Comanda este valida doar daca:
+         * - D7 si D6 sunt 1
+         * - ID-ul functiei este 0, 1 sau 2
+         * In caz contrar, iesirea ramane out = in.
+         */
         ax0 = dm(current_command);
         ay0 = CMD_VALID_MASK;
         ar = ax0 and ay0;
@@ -427,6 +424,7 @@ validate_command:
         ar = ax0 and ay0;
         dm(current_mode) = ar;
 
+        /* In functie de ID-ul functiei se configureaza AGC, ALE sau MF. */
         ax0 = dm(current_mode);
         ay0 = MODE_AGC;
         ar = ax0 - ay0;
@@ -583,6 +581,7 @@ write_display_value:
 
 
 process_agc:
+        /* AGC mentine nivelul semnalului aproape de o referinta prin adaptarea castigului. */
         ar = dm(selected_input);
         mx0 = ar;
         mr = 0;
@@ -659,6 +658,7 @@ agc_gain_done:
 
 
 process_mf:
+        /* MF copiaza fereastra curenta, o sorteaza si selecteaza elementul median. */
         ax0 = dm(selected_input);
         i0 = mf_delay + MF_BUF_LEN - 1;
         i1 = mf_delay + MF_BUF_LEN - 2;
@@ -749,6 +749,7 @@ mf_loop_i:
 
 
 process_ale:
+        /* ALE foloseste un filtru adaptiv pentru a evidentia componenta predictibila. */
         call generate_noise;
         mx0 = ar;
         my0 = dm(ale_a);
