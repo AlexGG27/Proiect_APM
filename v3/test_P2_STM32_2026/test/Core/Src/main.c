@@ -26,16 +26,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-/* Masina de stari TRS_CDA:
- * 0 - asteapta eliberarea lui PRG
- * 1 - asteapta apasarea lui PRG
- * 2 - transmite comanda catre DSP
- */
 typedef enum
 {
-  ARM_STATE_WAIT_PRG_LOW = 0,
-  ARM_STATE_WAIT_PRG_HIGH,
-  ARM_STATE_SEND_COMMAND
+  ARM_STATE_WAIT_RELEASE = 0,
+  ARM_STATE_WAIT_PRESS,
+  ARM_STATE_TRANSMIT
 } ArmState_t;
 
 /* USER CODE END PTD */
@@ -54,11 +49,12 @@ typedef enum
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-/* Valorile citite in callback-ul TIM2 sunt salvate aici si procesate in main loop. */
 static volatile uint8_t g_sampledCommand;
 static volatile uint8_t g_prgLevel;
 static volatile uint8_t g_tickReady;
-static ArmState_t g_armState = ARM_STATE_WAIT_PRG_LOW;
+static volatile uint8_t g_lastCommand;
+static uint8_t g_pendingCommand;
+static ArmState_t g_armState = ARM_STATE_WAIT_RELEASE;
 
 /* USER CODE END PV */
 
@@ -68,18 +64,16 @@ static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static uint8_t ARM_ReadCommand(void);
-static uint8_t ARM_ReadPrg(void);
-static ArmState_t ARM_NextState(ArmState_t currentState, uint8_t prgLevel);
-static void ARM_WriteOutputBus(uint8_t value);
-static void ARM_ProcessTick(uint8_t sampledCommand, uint8_t prgLevel);
+static uint8_t ARM_BuildCommand(uint8_t rawValue);
+static void ARM_WriteLedBus(uint8_t value);
+static void ARM_WriteCommandBus(uint8_t value);
+static void ARM_TransmitCommand(uint8_t value);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/* Callback-ul TIM2 face doar esantionarea intrarilor.
- * Masina de stari TRS_CDA este executata in afara intreruperii.
- */
+/* Timer2 Interrupt Service Routine*/
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim->Instance != TIM2)
@@ -88,7 +82,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 
   g_sampledCommand = ARM_ReadCommand();
-  g_prgLevel = ARM_ReadPrg();
+  g_prgLevel = (HAL_GPIO_ReadPin(PRG_GPIO_Port, PRG_Pin) == GPIO_PIN_SET) ? 1U : 0U;
   g_tickReady = 1U;
 }
 /* USER CODE END 0 */
@@ -124,8 +118,9 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  ARM_WriteOutputBus(0U);
-  HAL_TIM_Base_Start_IT(&htim2); //enable Timer 2 interrupt
+  ARM_WriteLedBus(0U);
+  ARM_WriteCommandBus(0U);
+  HAL_TIM_Base_Start_IT(&htim2); //porneste intreruperea periodica a lui TIM2
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,21 +130,43 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* Asteptam un nou esantion logic citit de TIM2. */
     if (g_tickReady == 0U)
     {
       continue;
     }
 
-    /* Copiem local valorile citite in intrerupere si eliberam flag-ul. */
     __disable_irq();
     uint8_t sampledCommand = g_sampledCommand;
     uint8_t prgLevel = g_prgLevel;
     g_tickReady = 0U;
     __enable_irq();
 
-    /* Aici se executa automatul TRS_CDA. */
-    ARM_ProcessTick(sampledCommand, prgLevel);
+    switch (g_armState)
+    {
+      case ARM_STATE_WAIT_RELEASE:
+        if (prgLevel == 0U)
+        {
+          g_armState = ARM_STATE_WAIT_PRESS;
+        }
+        break;
+
+      case ARM_STATE_WAIT_PRESS:
+        if (prgLevel != 0U)
+        {
+          g_pendingCommand = ARM_BuildCommand(sampledCommand);
+          g_armState = ARM_STATE_TRANSMIT;
+        }
+        break;
+
+      case ARM_STATE_TRANSMIT:
+        ARM_TransmitCommand(g_pendingCommand);
+        g_armState = ARM_STATE_WAIT_RELEASE;
+        break;
+
+      default:
+        g_armState = ARM_STATE_WAIT_RELEASE;
+        break;
+    }
   }
   /* USER CODE END 3 */
 }
@@ -304,55 +321,55 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 static uint8_t ARM_ReadCommand(void)
 {
-  /* B0..B7 sunt conectate pe PA1..PA8. */
-  return (uint8_t)((GPIOA->IDR >> 1U) & 0x00FFU);
+  uint8_t value = 0U;
+
+  value |= (HAL_GPIO_ReadPin(B0_GPIO_Port, B0_Pin) == GPIO_PIN_SET) ? (1U << 0) : 0U;
+  value |= (HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET) ? (1U << 1) : 0U;
+  value |= (HAL_GPIO_ReadPin(B2_GPIO_Port, B2_Pin) == GPIO_PIN_SET) ? (1U << 2) : 0U;
+  value |= (HAL_GPIO_ReadPin(B3_GPIO_Port, B3_Pin) == GPIO_PIN_SET) ? (1U << 3) : 0U;
+  value |= (HAL_GPIO_ReadPin(B4_GPIO_Port, B4_Pin) == GPIO_PIN_SET) ? (1U << 4) : 0U;
+  value |= (HAL_GPIO_ReadPin(B5_GPIO_Port, B5_Pin) == GPIO_PIN_SET) ? (1U << 5) : 0U;
+  value |= (HAL_GPIO_ReadPin(B6_GPIO_Port, B6_Pin) == GPIO_PIN_SET) ? (1U << 6) : 0U;
+  value |= (HAL_GPIO_ReadPin(B7_GPIO_Port, B7_Pin) == GPIO_PIN_SET) ? (1U << 7) : 0U;
+
+  return value;
 }
 
-static uint8_t ARM_ReadPrg(void)
+static uint8_t ARM_BuildCommand(uint8_t rawValue)
 {
-  /* PRG este conectat pe PA9. */
-  return (uint8_t)((GPIOA->IDR >> 9U) & 0x01U);
+  /* D7 si D6 raman biti de validare, iar bitii D5...D0 sunt preluati din intrare. */
+  return (uint8_t)(0xC0U | (rawValue & 0x3FU));
 }
 
-static ArmState_t ARM_NextState(ArmState_t currentState, uint8_t prgLevel)
+static void ARM_WriteLedBus(uint8_t value)
 {
-  /* Tranzitiile depind doar de starea curenta si de nivelul lui PRG. */
-  switch (currentState)
-  {
-    case ARM_STATE_WAIT_PRG_LOW:
-      /* Dupa eliberarea butonului putem astepta o noua apasare. */
-      return (prgLevel == 0U) ? ARM_STATE_WAIT_PRG_HIGH : ARM_STATE_WAIT_PRG_LOW;
-
-    case ARM_STATE_WAIT_PRG_HIGH:
-      /* Cand PRG este apasat, comanda este gata pentru transmitere. */
-      return (prgLevel != 0U) ? ARM_STATE_SEND_COMMAND : ARM_STATE_WAIT_PRG_HIGH;
-
-    case ARM_STATE_SEND_COMMAND:
-    default:
-      /* Dupa transmitere revenim in starea initiala. */
-      return ARM_STATE_WAIT_PRG_LOW;
-  }
+  HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, (value & (1U << 0)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, (value & (1U << 1)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, (value & (1U << 2)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, (value & (1U << 3)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, (value & (1U << 4)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED5_GPIO_Port, LED5_Pin, (value & (1U << 5)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED6_GPIO_Port, LED6_Pin, (value & (1U << 6)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED7_GPIO_Port, LED7_Pin, (value & (1U << 7)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-static void ARM_WriteOutputBus(uint8_t value)
+static void ARM_WriteCommandBus(uint8_t value)
 {
-  /* PB7..PB0 = LED7..LED0, PB15..PB8 = PCDA7..PCDA0. */
-  GPIOB->ODR = (uint16_t)(((uint16_t)value << 8U) | value);
+  HAL_GPIO_WritePin(PCDA0_GPIO_Port, PCDA0_Pin, (value & (1U << 0)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA1_GPIO_Port, PCDA1_Pin, (value & (1U << 1)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA2_GPIO_Port, PCDA2_Pin, (value & (1U << 2)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA3_GPIO_Port, PCDA3_Pin, (value & (1U << 3)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA4_GPIO_Port, PCDA4_Pin, (value & (1U << 4)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA5_GPIO_Port, PCDA5_Pin, (value & (1U << 5)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA6_GPIO_Port, PCDA6_Pin, (value & (1U << 6)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(PCDA7_GPIO_Port, PCDA7_Pin, (value & (1U << 7)) ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-static void ARM_ProcessTick(uint8_t sampledCommand, uint8_t prgLevel)
+static void ARM_TransmitCommand(uint8_t value)
 {
-  /* Actualizam starea automatului TRS_CDA pe baza lui PRG. */
-  g_armState = ARM_NextState(g_armState, prgLevel);
-
-  if (g_armState == ARM_STATE_SEND_COMMAND)
-  {
-    /* La o apasare valida, aceeasi comanda este afisata pe LED-uri
-     * si transmisa catre DSP pe magistrala PCDA.
-     */
-    ARM_WriteOutputBus(sampledCommand);
-    g_armState = ARM_STATE_WAIT_PRG_LOW;
-  }
+  g_lastCommand = value;
+  ARM_WriteLedBus(g_lastCommand);
+  ARM_WriteCommandBus(g_lastCommand);
 }
 
 /* USER CODE END 4 */

@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone="no"?>
+<?xml-stylesheet type="text/xsl" href="file:///C:/Program Files (x86)/Analog Devices/VisualDSP 3.5 16-Bit/System/linker_log.xsl"?>
+<DOCUMENT gen_time='Tue Feb 09 07:51:19 2021
+'>
+<MSG id='025C4CB8' mid='li1021' type='Error'>
+<TEXT><![CDATA[The following symbols referenced in processor 'p0' could not be resolved:
+        'PF_input' referenced from '.\Debug\test_ext.doj'
+        'PF_output' referenced from '.\Debug\test_ext.doj']]></TEXT>
+</MSG>
+</DOCUMENT>
