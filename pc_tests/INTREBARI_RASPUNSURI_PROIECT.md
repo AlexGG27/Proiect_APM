@@ -75,8 +75,7 @@ In cod exista:
 typedef enum
 {
   ARM_STATE_WAIT_PRG_LOW = 0,
-  ARM_STATE_WAIT_PRG_HIGH,
-  ARM_STATE_SEND_COMMAND
+  ARM_STATE_WAIT_PRG_HIGH
 } ArmState_t;
 ```
 
@@ -86,8 +85,6 @@ Semnificatie:
   - asteapta eliberarea lui `PRG`
 - `WAIT_PRG_HIGH`
   - dupa eliberare, asteapta o noua apasare
-- `SEND_COMMAND`
-  - transmite comanda catre DSP
 
 ### 3.3. De ce exista aceasta masina de stari
 
@@ -108,24 +105,44 @@ El produce o intrerupere periodica. In callback:
 ```c
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  (void)htim;
-  g_sampledCommand = ARM_ReadCommand();
-  g_prgLevel = ARM_ReadPrg();
-  g_tickReady = 1U;
+  if (htim->Instance != TIM2)
+  {
+    return;
+  }
+
+  uint8_t prgLevel = ARM_ReadPrg();
+
+  switch (g_armState)
+  {
+    case ARM_STATE_WAIT_PRG_LOW:
+      if (prgLevel == 0U)
+      {
+        g_armState = ARM_STATE_WAIT_PRG_HIGH;
+      }
+      break;
+
+    case ARM_STATE_WAIT_PRG_HIGH:
+      if (prgLevel != 0U)
+      {
+        ARM_WriteOutputBus(ARM_ReadCommand());
+        g_armState = ARM_STATE_WAIT_PRG_LOW;
+      }
+      break;
+  }
 }
 ```
 
 Observatie foarte importanta:
 
-- callback-ul nu executa toata logica
-- callback-ul doar citeste intrarile
-- logica propriu-zisa se face in `main`
+- callback-ul executa toata logica STM32
+- cand detecteaza o apasare valida, transmite imediat comanda
+- `main` ramane foarte simplu si doar asteapta urmatoarea intrerupere
 
 Asta este bine pentru ca:
 
-- ISR-ul ramane scurt
-- comportamentul este mai predictibil
-- codul este mai usor de explicat
+- nu mai exista sincronizare suplimentara intre ISR si `main`
+- transmiterea se face exact in tick-ul in care a fost detectata apasarea
+- codul este mai scurt si mai usor de urmarit
 
 ### 3.5. Cum se citeste comanda
 
@@ -183,26 +200,34 @@ Deci aceeasi comanda este:
 
 ### 3.8. Cum se executa masina de stari
 
-Functia importanta este:
+Masina de stari ruleaza chiar in `HAL_TIM_PeriodElapsedCallback()`:
 
 ```c
-static void ARM_ProcessTick(uint8_t sampledCommand, uint8_t prgLevel)
+switch (g_armState)
 {
-  g_armState = ARM_NextState(g_armState, prgLevel);
+  case ARM_STATE_WAIT_PRG_LOW:
+    if (prgLevel == 0U)
+    {
+      g_armState = ARM_STATE_WAIT_PRG_HIGH;
+    }
+    break;
 
-  if (g_armState == ARM_STATE_SEND_COMMAND)
-  {
-    ARM_WriteOutputBus(sampledCommand);
-    g_armState = ARM_STATE_WAIT_PRG_LOW;
-  }
+  case ARM_STATE_WAIT_PRG_HIGH:
+    if (prgLevel != 0U)
+    {
+      ARM_WriteOutputBus(ARM_ReadCommand());
+      g_armState = ARM_STATE_WAIT_PRG_LOW;
+    }
+    break;
 }
 ```
 
 Explicatie:
 
-1. Se calculeaza starea urmatoare in functie de `PRG`.
-2. Daca s-a ajuns in `SEND_COMMAND`, se transmite comanda.
-3. Dupa transmitere, se revine in starea initiala.
+1. Se asteapta mai intai eliberarea lui `PRG`.
+2. Dupa aceea se asteapta o noua apasare.
+3. Chiar in momentul detectiei, comanda este scrisa pe LED-uri si pe `PCDA`.
+4. Sistemul revine apoi in starea initiala.
 
 ### 3.9. Configurarea de ceas
 
