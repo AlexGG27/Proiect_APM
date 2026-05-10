@@ -26,16 +26,10 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-/* Masina de stari TRS_CDA:
- * 0 - asteapta eliberarea lui PRG
- * 1 - asteapta apasarea lui PRG
- * 2 - transmite comanda catre DSP
- */
 typedef enum
 {
   ARM_STATE_WAIT_PRG_LOW = 0,
-  ARM_STATE_WAIT_PRG_HIGH,
-  ARM_STATE_SEND_COMMAND
+  ARM_STATE_WAIT_PRG_HIGH
 } ArmState_t;
 
 /* USER CODE END PTD */
@@ -54,10 +48,6 @@ typedef enum
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-/* Valorile citite in callback-ul TIM2 sunt salvate aici si procesate in main loop. */
-static volatile uint8_t g_sampledCommand;
-static volatile uint8_t g_prgLevel;
-static volatile uint8_t g_tickReady;
 static ArmState_t g_armState = ARM_STATE_WAIT_PRG_LOW;
 
 /* USER CODE END PV */
@@ -69,17 +59,13 @@ static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static uint8_t ARM_ReadCommand(void);
 static uint8_t ARM_ReadPrg(void);
-static ArmState_t ARM_NextState(ArmState_t currentState, uint8_t prgLevel);
 static void ARM_WriteOutputBus(uint8_t value);
-static void ARM_ProcessTick(uint8_t sampledCommand, uint8_t prgLevel);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/* Callback-ul TIM2 face doar esantionarea intrarilor.
- * Masina de stari TRS_CDA este executata in afara intreruperii.
- */
+/* TIM2 citeste periodic intrarile si trimite comanda imediat la o apasare valida. */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim->Instance != TIM2)
@@ -87,9 +73,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     return;
   }
 
-  g_sampledCommand = ARM_ReadCommand();
-  g_prgLevel = ARM_ReadPrg();
-  g_tickReady = 1U;
+  uint8_t prgLevel = ARM_ReadPrg();
+
+  switch (g_armState)
+  {
+    case ARM_STATE_WAIT_PRG_LOW:
+      if (prgLevel == 0U)
+      {
+        g_armState = ARM_STATE_WAIT_PRG_HIGH;
+      }
+      break;
+
+    case ARM_STATE_WAIT_PRG_HIGH:
+      if (prgLevel != 0U)
+      {
+        ARM_WriteOutputBus(ARM_ReadCommand());
+        g_armState = ARM_STATE_WAIT_PRG_LOW;
+      }
+      break;
+
+    default:
+      g_armState = ARM_STATE_WAIT_PRG_LOW;
+      break;
+  }
 }
 /* USER CODE END 0 */
 
@@ -135,21 +141,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* Asteptam un nou esantion logic citit de TIM2. */
-    if (g_tickReady == 0U)
-    {
-      continue;
-    }
-
-    /* Copiem local valorile citite in intrerupere si eliberam flag-ul. */
-    __disable_irq();
-    uint8_t sampledCommand = g_sampledCommand;
-    uint8_t prgLevel = g_prgLevel;
-    g_tickReady = 0U;
-    __enable_irq();
-
-    /* Aici se executa automatul TRS_CDA. */
-    ARM_ProcessTick(sampledCommand, prgLevel);
+    __WFI();
   }
   /* USER CODE END 3 */
 }
@@ -314,45 +306,10 @@ static uint8_t ARM_ReadPrg(void)
   return (uint8_t)((GPIOA->IDR >> 9U) & 0x01U);
 }
 
-static ArmState_t ARM_NextState(ArmState_t currentState, uint8_t prgLevel)
-{
-  /* Tranzitiile depind doar de starea curenta si de nivelul lui PRG. */
-  switch (currentState)
-  {
-    case ARM_STATE_WAIT_PRG_LOW:
-      /* Dupa eliberarea butonului putem astepta o noua apasare. */
-      return (prgLevel == 0U) ? ARM_STATE_WAIT_PRG_HIGH : ARM_STATE_WAIT_PRG_LOW;
-
-    case ARM_STATE_WAIT_PRG_HIGH:
-      /* Cand PRG este apasat, comanda este gata pentru transmitere. */
-      return (prgLevel != 0U) ? ARM_STATE_SEND_COMMAND : ARM_STATE_WAIT_PRG_HIGH;
-
-    case ARM_STATE_SEND_COMMAND:
-    default:
-      /* Dupa transmitere revenim in starea initiala. */
-      return ARM_STATE_WAIT_PRG_LOW;
-  }
-}
-
 static void ARM_WriteOutputBus(uint8_t value)
 {
   /* PB7..PB0 = LED7..LED0, PB15..PB8 = PCDA7..PCDA0. */
   GPIOB->ODR = (uint16_t)(((uint16_t)value << 8U) | value);
-}
-
-static void ARM_ProcessTick(uint8_t sampledCommand, uint8_t prgLevel)
-{
-  /* Actualizam starea automatului TRS_CDA pe baza lui PRG. */
-  g_armState = ARM_NextState(g_armState, prgLevel);
-
-  if (g_armState == ARM_STATE_SEND_COMMAND)
-  {
-    /* La o apasare valida, aceeasi comanda este afisata pe LED-uri
-     * si transmisa catre DSP pe magistrala PCDA.
-     */
-    ARM_WriteOutputBus(sampledCommand);
-    g_armState = ARM_STATE_WAIT_PRG_LOW;
-  }
 }
 
 /* USER CODE END 4 */

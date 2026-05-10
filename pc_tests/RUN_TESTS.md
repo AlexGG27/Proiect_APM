@@ -4,14 +4,15 @@ This folder contains the PC-only tests you can use without hardware.
 
 ## 1. STM32 logic and build
 
-The STM32 code was simplified so the `TIM2` callback only samples inputs and sets a flag.
+The STM32 code was simplified so the `TIM2` callback both samples the inputs and sends the command immediately when a valid `PRG` press is detected.
 
 What changed conceptually:
 
 - command read is hardcoded from `GPIOA->IDR`
 - LED + PCDA output is hardcoded to `GPIOB->ODR`
-- the `TIM2` callback no longer contains an `if`
-- the state machine runs in the main loop
+- the state machine runs directly in the `TIM2` interrupt
+- the command is written to LED + PCDA directly from the interrupt
+- the `main` loop only waits for interrupts with `__WFI()`
 
 ### What to verify in STM32CubeIDE
 
@@ -19,11 +20,12 @@ What changed conceptually:
 2. `Project -> Clean`
 3. `Project -> Build Project`
 4. Open `Core/Src/main.c` and verify:
-   - `HAL_TIM_PeriodElapsedCallback()` only samples command and `PRG`
+   - `HAL_TIM_PeriodElapsedCallback()` reads `PRG` and decides the state transition
    - `ARM_ReadCommand()` uses `GPIOA->IDR`
    - `ARM_ReadPrg()` uses `GPIOA->IDR`
    - `ARM_WriteOutputBus()` writes the whole 16-bit LED+PCDA bus
-   - `ARM_ProcessTick()` handles the state machine outside the interrupt
+   - the callback writes the command with `ARM_WriteOutputBus(ARM_ReadCommand())`
+   - the `while(1)` loop only executes `__WFI()`
 
 ## 2. DSP simulator with graph plotting
 
