@@ -478,39 +478,176 @@ ALE este de obicei cel mai costisitor, deoarece are FIR cu `N_ALE=256` si actual
 ### 150. Care algoritm este cel mai simplu?
 Bypass este cel mai simplu, apoi MF cu fereastra mica sau AGC cu `M_AGC=4`, in functie de implementare.
 
-## 13. Raspunsuri scurte de retinut
+## 13. Switch-uri, initializari si zgomot
 
-### 151. Cum explici proiectul in 20 de secunde?
+### 151. De ce ar intreba profesorul despre switch-uri?
+Pentru ca switch-urile `SW7..SW0` sunt modul manual prin care utilizatorul poate alege parametrii algoritmilor DSP, nu doar algoritmul in sine.
+
+### 152. Codul ASM activ citeste switch-urile?
+Nu. Codul ASM activ are parametrii fixati in cod. Totusi, documentatia si varianta `v3` contin ideea de citire a switch-urilor prin `PORT_IN`.
+
+### 153. Cum raspunzi daca profesorul intreaba de ce nu apar switch-urile in codul activ?
+Spui clar ca in fisierul activ parametrii sunt hardcodati, iar extinderea naturala este citirea `SW7..SW0` din extensia I/O si maparea lor pe tabele de parametri.
+
+### 154. Ce rol ar avea `SW7..SW0` pentru AGC?
+Pentru AGC, switch-urile pot alege valoarea de referinta `REF`, dimensiunea ferestrei `M` si pasul de adaptare `mu`.
+
+### 155. Cum pot fi impartiti bitii de switch pentru AGC?
+O mapare posibila din documentatie este: `SW7..SW6` pentru `REF`, `SW5..SW4` pentru `M`, `SW3..SW2` pentru `mu`, iar `SW1..SW0` nefolositi.
+
+### 156. Ce efect are `REF` in AGC?
+`REF` stabileste nivelul tinta al iesirii. Daca `REF` este mai mare, AGC incearca sa obtina o iesire mai puternica.
+
+### 157. Ce efect are `M` in AGC?
+`M` stabileste cate esantioane sunt folosite pentru media amplitudinii. Un `M` mai mare face raspunsul mai lent, dar mai stabil.
+
+### 158. Ce efect are `mu` in AGC?
+`mu` controleaza viteza adaptarii castigului. Valori mari raspund repede, dar pot produce oscilatii.
+
+### 159. Ce rol ar avea `SW7..SW0` pentru ALE?
+Pentru ALE, switch-urile pot alege intarzierea `D`, coeficientul de zgomot/amestec `a`, pasul `mu` si factorul `lambda`.
+
+### 160. Cum pot fi impartiti bitii de switch pentru ALE?
+O mapare posibila este: `SW7..SW6` pentru `D`, `SW5..SW4` pentru `a`, `SW3..SW2` pentru `mu`, iar `SW1..SW0` pentru `lambda`.
+
+### 161. Ce efect are intarzierea `D` la ALE?
+Intarzierea ajuta la separarea componentei corelate a semnalului de zgomotul mai putin corelat. O alegere buna a lui `D` ajuta filtrul adaptiv sa invete semnalul util.
+
+### 162. Ce efect are parametrul `a` la ALE?
+`a` poate controla cat de mult zgomot sau semnal intarziat este amestecat in intrare, in functie de varianta de implementare.
+
+### 163. Ce efect are `lambda` la ALE?
+`lambda` este factorul de leak. El reduce riscul ca coeficientii filtrului sa creasca necontrolat si ajuta stabilitatea pe termen lung.
+
+### 164. Ce rol ar avea `SW7..SW0` pentru MF?
+Pentru filtrul median, switch-urile pot alege dimensiunea ferestrei, de exemplu prin parametrul `K`.
+
+### 165. Cum pot fi folositi switch-urile pentru MF?
+O mapare posibila este `SW1..SW0` pentru `K`, iar `SW7..SW2` nefolositi.
+
+### 166. Ce se intampla daca fereastra MF este mai mare?
+Filtrul elimina mai bine impulsurile izolate, dar introduce mai multa intarziere si necesita mai multe comparatii la sortare.
+
+### 167. De ce se folosesc tabele pentru parametri?
+Tabelele transforma combinatii scurte de biti in valori numerice utile, de exemplu `0.01`, `0.05`, `128`, `0.5`. Este mai simplu decat calcule complexe in assembler.
+
+### 168. Ce este `PORT_IN` in varianta cu switch-uri?
+`PORT_IN` este portul de I/O prin care DSP-ul poate citi starea switch-urilor de pe extensia hardware.
+
+### 169. Ce este `debug_switches`?
+`debug_switches` este o variabila folosita in simulare ca inlocuitor pentru switch-urile fizice, ca sa poti testa parametrii fara placa reala.
+
+### 170. Cand trebuie citite switch-urile?
+Cel mai logic este sa fie citite la primirea unei comenzi noi, nu la fiecare esantion, ca parametrii sa ramana stabili in timpul procesarii.
+
+### 171. Ce initializari se fac la pornirea DSP-ului?
+Se configureaza registrii de sistem, SPORT0, autobuffering-ul, pointerii pentru `rx_buf`, `tx_buf` si `init_cmds`, intreruperile si variabilele initiale de control.
+
+### 172. De ce se initializeaza `i5/l5` si `i6/l6`?
+`i5/l5` definesc bufferul circular de receptie `rx_buf`, iar `i6/l6` definesc bufferul circular de transmisie `tx_buf`.
+
+### 173. De ce se initializeaza `cda_prev = 3`?
+Pentru a forta la prima comanda o schimbare de algoritm. Astfel, algoritmul selectat va intra pe ramura de initializare.
+
+### 174. De ce se initializeaza `Flag_CDA = 1` dupa reset?
+Pentru ca DSP-ul sa citeasca o comanda initiala dupa pornire, fara sa astepte neaparat o prima intrerupere externa.
+
+### 175. Ce face `agc_init` mai exact?
+Reseteaza suma/estimarea amplitudinii, castigul, seteaza `ref_agc` si `mu_agc`, configureaza pointerul pentru `delay_agc` si coboara flag-ul de initializare.
+
+### 176. Ce face `ale_init` mai exact?
+Seteaza `mu_ale` si `lambda_ale`, configureaza pointerii pentru `input_ale`, `fir_d` si `hh`, apoi pune la zero liniile de intarziere si coeficientii.
+
+### 177. De ce coeficientii ALE sunt initializati cu zero?
+Pentru ca filtrul adaptiv sa porneasca dintr-o stare cunoscuta. Coeficientii sunt apoi invatati progresiv de algoritmul LLMS.
+
+### 178. Ce face `mf_init` mai exact?
+Configureaza pointerul circular pentru fereastra medianului si reseteaza flag-ul de initializare.
+
+### 179. De ce trebuie reinitializat algoritmul cand se schimba comanda?
+Pentru ca fiecare algoritm are stare interna. Daca treci din ALE in AGC sau MF fara resetare, datele vechi pot contamina rezultatul.
+
+### 180. Ce initializare este sensibila la hardware?
+Initializarea CODEC-ului AD1847 este sensibila la hardware. Daca secventa din `init_cmds` este sarita sau incompleta, audio poate sa nu porneasca corect.
+
+### 181. Ce este zgomotul in contextul proiectului?
+Zgomotul este o componenta nedorita a semnalului, care poate fi aleatoare, impulsiva sau de banda larga si care afecteaza calitatea semnalului util.
+
+### 182. Ce tip de zgomot trateaza cel mai bine MF?
+Filtrul median trateaza foarte bine zgomotul impulsiv, adica spike-uri scurte si valori extreme izolate.
+
+### 183. Ce tip de zgomot trateaza mai bine ALE?
+ALE este util cand semnalul util este periodic sau corelat, iar zgomotul este mai aleator si mai putin corelat in timp.
+
+### 184. AGC elimina zgomotul?
+Nu in mod direct. AGC modifica nivelul semnalului. Daca zgomotul este prezent impreuna cu semnalul, AGC poate amplifica si zgomotul atunci cand creste castigul.
+
+### 185. De ce apare discutia despre zgomot la ALE?
+Pentru ca ALE foloseste corelatia temporala: semnalul periodic ramane predictibil dupa intarziere, in timp ce zgomotul aleator devine mai greu de prezis.
+
+### 186. Ce este un LFSR?
+LFSR inseamna Linear Feedback Shift Register. Este o metoda simpla de generare pseudo-aleatoare, folosita des pentru zgomot de test in simulare.
+
+### 187. De ce ai genera zgomot intern in simulare?
+Ca sa poti testa filtrul ALE sau MF chiar si fara o sursa externa de zgomot sau fara hardware complet.
+
+### 188. Ce diferenta este intre zgomot impulsiv si zgomot aleator de banda larga?
+Zgomotul impulsiv apare ca varfuri rare si mari, iar zgomotul de banda larga este raspandit pe multe frecvente si apare mai continuu.
+
+### 189. Care algoritm e potrivit pentru spike-uri?
+MF este cel mai potrivit, deoarece mediana ignora valorile extreme izolate.
+
+### 190. Care algoritm e potrivit pentru un sinus acoperit de zgomot?
+ALE este potrivit daca sinusul este componenta corelata/predictibila si zgomotul este mai putin corelat.
+
+### 191. Ce inseamna SNR?
+SNR inseamna Signal-to-Noise Ratio, adica raportul dintre semnalul util si zgomot. Un SNR mai mare inseamna un semnal mai curat.
+
+### 192. Cum poate imbunatati ALE SNR-ul?
+Prin estimarea componentei predictibile si reducerea contributiei zgomotului necorelat in iesire.
+
+### 193. Cum poate afecta AGC SNR-ul?
+AGC poate mentine nivelul semnalului, dar nu distinge perfect intre semnal si zgomot. Daca intrarea este slaba si zgomotoasa, poate amplifica ambele componente.
+
+### 194. De ce trebuie explicat clar tipul de zgomot?
+Pentru ca fiecare algoritm are o tinta diferita: MF pentru impulsuri, ALE pentru zgomot aleator peste semnal corelat, AGC pentru nivel/amplitudine, nu pentru denoising propriu-zis.
+
+### 195. Ce raspuns scurt poti da daca esti intrebat "unde e zgomotul in codul activ"?
+In fisierul ASM activ nu exista generator explicit de zgomot; zgomotul este considerat parte din semnalul de intrare sau din scenariile de simulare/documentatie.
+
+## 14. Raspunsuri scurte de retinut
+
+### 196. Cum explici proiectul in 20 de secunde?
 STM32 construieste si transmite o comanda pe 8 biti, iar DSP-ul o decodeaza si aplica in timp real unul dintre algoritmii `AGC`, `ALE` sau `MF` pe canalul audio selectat.
 
-### 152. Cum explici partea DSP intr-o fraza?
+### 197. Cum explici partea DSP intr-o fraza?
 DSP-ul primeste esantioane prin `SPORT0`, citeste comenzi prin `Prog_Flag_Data`, valideaza comanda si proceseaza audio in rutina `input_samples`.
 
-### 153. Cum explici AGC intr-o fraza?
+### 198. Cum explici AGC intr-o fraza?
 AGC modifica automat castigul pentru ca amplitudinea iesirii sa ramana aproape de o referinta.
 
-### 154. Cum explici ALE intr-o fraza?
+### 199. Cum explici ALE intr-o fraza?
 ALE foloseste un filtru adaptiv pentru a extrage componentele predictibile ale semnalului si pentru a reduce componentele mai putin corelate.
 
-### 155. Cum explici MF intr-o fraza?
+### 200. Cum explici MF intr-o fraza?
 MF sorteaza o fereastra de esantioane si alege mediana, eliminand bine spike-urile.
 
-### 156. Cum explici `Flag_CDA` intr-o fraza?
+### 201. Cum explici `Flag_CDA` intr-o fraza?
 `Flag_CDA` spune rutinei audio ca exista o comanda noua de citit de la ARM.
 
-### 157. Cum explici selectia canalului intr-o fraza?
+### 202. Cum explici selectia canalului intr-o fraza?
 Bitul `D3` decide daca DSP-ul citeste si scrie canalul stang sau drept.
 
-### 158. Cum explici validarea comenzii intr-o fraza?
+### 203. Cum explici validarea comenzii intr-o fraza?
 DSP-ul accepta comanda doar daca `D7-D6=11` si ID-ul din `D2-D0` este `001`.
 
-### 159. Cum explici rolul SPORT0 intr-o fraza?
+### 204. Cum explici rolul SPORT0 intr-o fraza?
 `SPORT0` este interfata seriala prin care DSP-ul schimba cadre audio cu CODEC-ul AD1847.
 
-### 160. Cum explici de ce sunt folosite intreruperi?
+### 205. Cum explici de ce sunt folosite intreruperi?
 Intreruperile permit sincronizarea cu evenimente reale: comanda noua de la ARM si esantion audio nou de la CODEC.
 
-## 14. Lista rapida de lucruri de invatat
+## 15. Lista rapida de lucruri de invatat
 
 1. Formatul comenzii: `D7-D6` validare, `D5-D4` algoritm, `D3` canal, `D2-D0` ID.
 2. Exemplele `0xC1`, `0xD1`, `0xE1`, `0xC9`, `0xD9`, `0xE9`.
@@ -527,3 +664,8 @@ Intreruperile permit sincronizarea cu evenimente reale: comanda noua de la ARM s
 13. Faptul ca fisierul activ nu citeste `SW7..SW0`.
 14. Faptul ca `write_out` scrie doar canalul selectat.
 15. Faptul ca build-ul trebuie refacut dupa modificarea ASM-ului.
+16. Ce ar controla switch-urile pentru AGC, ALE si MF.
+17. Diferenta intre zgomot impulsiv si zgomot aleator.
+18. De ce MF e bun la spike-uri, iar ALE la semnale corelate acoperite de zgomot.
+19. Ce face fiecare rutina de initializare: `agc_init`, `ale_init`, `mf_init`.
+20. De ce AGC nu este, propriu-zis, un algoritm de eliminare a zgomotului.
